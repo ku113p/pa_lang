@@ -47,6 +47,8 @@ Two measurements are reported:
 
 The "code body" measurement is used for comparison against PA bytecode, as it is the closest analog (instruction bytes only, no container overhead).
 
+**Semantic density caveat**: Wasm instruction bytes carry more semantic weight per byte than PA bytecode. Each Wasm instruction encodes type information, stack effects, and validation metadata. PA instructions encode only the operation and operand pattern. The size comparison is a real measurement of byte counts, but the two formats encode different amounts of information per instruction. PA being smaller does not imply PA is "better" — it reflects a simpler encoding with fewer guarantees.
+
 SIMD kernels use Wasm SIMD (128-bit, `v128.load`, `i8x16.eq`, `i8x16.bitmask`, etc.). Scalar kernels use standard Wasm instructions.
 
 ## What Is Excluded

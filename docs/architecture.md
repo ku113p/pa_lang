@@ -117,6 +117,14 @@ This is a simplification for MVP. A production ISA would use explicit register o
 - `gcp`: compares two vector registers bytewise, produces a mismatch mask
 - `ffz`: finds the index of the first set bit in a predicate mask
 
+**The compare-mask-extract pattern**: Most scanning kernels follow a three-step pattern. Consider `find_zero` (find the first zero byte in a buffer):
+
+1. `gld gA` — load 16 bytes from memory into vector register v0
+2. `gcm pA` — compare each byte in v0 against 0x00, producing a 16-bit predicate mask in p0. Each bit records whether the corresponding byte matched.
+3. `ffz fA` — find the index of the first set bit in p0. This gives the position of the first zero byte within the 16-byte chunk.
+
+PA has no predicate OR instruction — you cannot combine two predicate masks (e.g., "byte is 0x0A OR byte is 0x0D"). This is why multi-value searches like memchr2 require awkward scalar fallbacks and fall into Class B.
+
 ## Bytecode Format (.pac)
 
 ```

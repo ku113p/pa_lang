@@ -17,6 +17,7 @@ PA is an experimental compact assembly language and bytecode for a tiny register
 - [Benchmark Results](#benchmark-results)
 - [Where PA Works Best](#where-pa-works-best)
 - [Where PA Does Not Work Well](#where-pa-does-not-work-well)
+- [Possible Deployment Directions](#possible-deployment-directions)
 - [What Changed in v0.2](#what-changed-in-v02)
 - [Key Findings](#key-findings)
 - [Design Decisions](#design-decisions)
@@ -42,9 +43,10 @@ Assembly operands are verbose. `add r1, r3` repeats register patterns that appea
 
 ## What PA Is Not
 
-- **Not a Wasm replacement** — Wasm has toolchains, runtimes, a formal spec, and industry adoption
+- **Not a Wasm replacement** — Wasm has toolchains, runtimes, a formal spec, type safety, structured control flow, validation guarantees, and industry adoption
 - **Not a general-purpose programming language** — 15 opcodes, 38 cells, no compiler
 - **Not a claim about runtime performance** — the VM is interpreted Python
+- **Not a claim about encoding superiority** — PA encodes fewer semantics per instruction than Wasm or JVM; smaller byte count does not mean "better"
 - **Not a production tool or ecosystem** — this is a measured experiment
 - **Not trying to replace x86, ARM, or any real ISA**
 
@@ -123,6 +125,8 @@ Cells are compact symbolic operand templates. Each cell maps to a fixed operand 
 
 38 cells total across 8 families, covering 21 benchmark kernels.
 
+A **predicate** (`p*` family) is a comparison mask: compare 16 bytes against a target value, get a 16-bit result where each bit says "match" or "no match." The `ffz` instruction then finds the position of the first match. This compare-mask-extract pattern is how PA handles scanning operations.
+
 ## Try It
 
 ```bash
@@ -178,7 +182,11 @@ x86 sizes are **assembled** with NASM (`nasm -f bin`). Wasm sizes are instructio
 
 **Weighted averages**: PA/x86 = 56%, PA/Wasm = 30%, bytes/instruction = 1.85
 
+*Note: PA bytecode encodes fewer semantics per instruction than Wasm. A Wasm instruction carries type, stack-effect, and validation information; PA's `ad xF` carries only "add these two registers." PA's smaller byte count reflects a simpler encoding, not a denser one.*
+
 ### External Kernels (14 — not designed for PA)
+
+External kernels are classified by how naturally they fit PA's encoding: **Class A** (fits naturally, uses core scan patterns), **Class B** (expressible with friction — register shuffling, missing predicate OR for multi-value searches), **Class C** (core operations absent, outside PA's scope).
 
 | Kernel | Class | PA bc | x86 mc | PA/x86 |
 |--------|-------|-------|--------|--------|
@@ -209,11 +217,23 @@ On these kernels, PA bytecode is 36-49% of x86 machine code. The cell system com
 
 ## Where PA Does Not Work Well
 
+PA targets vectorized equality-scan patterns. The following categories fall outside this niche:
+
 - **Ordered comparisons** (find_byte_lt, min/max): PA's condition flag is zero/nonzero only. Ordered compare requires v0.2's `cm` compact cells or extended `cm!`. Still scalar — no vectorized threshold scan.
 - **Multi-condition scans** (strchr, memchr2): PA has no predicate OR. Scanning for two conditions simultaneously requires separate scalar checks.
 - **Set-membership** (strspn): PA cannot express "is byte one of these N values." Requires fundamentally different operations (lookup tables, multi-way compare).
 - **Reverse scanning** (memrchr): PA has only forward bit-scan (ffz/BSF). No reverse bit-scan (BSR equivalent).
 - **Register pressure** (bytecount): The fixed cell-to-register mapping creates friction when operations need more than 4 active registers. Extended `mv!` shuffling adds 3 bytes per swap.
+
+## Possible Deployment Directions
+
+PA is an experiment, not a product. The following directions are plausible based on measured properties (bytecode density, interpreter footprint, kernel fit), not demonstrated deployments. No C implementation, no safety model, and no verifier exist yet.
+
+- **Embeddable scanning filter**: PA's 1.85 B/instr density and tiny interpreter (~700 LOC) could suit a compact userspace filter VM for byte-level scanning — signature matching, delimiter detection, byte-stream classification. eBPF uses fixed 8-byte instructions prioritizing verifiability; PA trades safety guarantees for ~4x denser encoding in its narrow niche. *Gap: no C VM, no safety model, no integration test.*
+- **Compact codegen target**: The 2-byte fixed encoding with 15 opcodes and 38 cells is a small, enumerable target for DSLs or code generators emitting scanning kernels. PA bytecode is 70% smaller than Wasm for equivalent kernels. *Gap: no compiler frontend exists.*
+- **Research and teaching**: Complete reproducible implementation with ablation methodology, explicit negative results, and measured comparisons against x86 and Wasm. *Gap: not peer-reviewed, corpus is small.*
+
+None of these are product plans. They are directions where the encoding density results suggest PA might be worth investigating further.
 
 ## What Changed in v0.2
 
@@ -242,6 +262,7 @@ Result: extended instructions eliminated from all 7 original kernels. Cell table
 - **Condition flag**: simplifies branch encoding vs explicit register-test operands
 - **Dict dispatch**: simple, readable; performance difference negligible for ~15 opcodes
 - **No JIT/optimizer/verifier**: validate the encoding idea first
+- **Register-input parameters**: PA's calling convention naturally separates code templates from mutable parameters. A kernel like find_delim is a fixed 20-byte template that operates on whatever delimiter byte the caller loads into r1 — updating the delimiter requires no bytecode change. This property is inherent to the cell-based encoding, which keeps application-specific values out of the instruction stream
 
 ## Limitations
 
@@ -255,6 +276,8 @@ Result: extended instructions eliminated from all 7 original kernels. Cell table
 - x86 reference is hand-written assembly, not compiler output
 - WAT is hand-written, not compiled from C/Rust
 
+**Why the Python VM is not a fatal flaw**: PA's claims are about encoding density, not runtime speed. Bytecode sizes are measured from assembler output — a static property independent of VM implementation language. The Python VM exists to validate correctness (assembled bytecode runs and produces expected results). A C implementation would be needed before any performance claims, and none are made.
+
 ### Threats to Validity
 
 - Benchmark suite is still small (~21 kernels)
@@ -266,7 +289,7 @@ Result: extended instructions eliminated from all 7 original kernels. Cell table
 
 The numbers are real — x86 sizes are assembled with NASM, Wasm sizes are compiled with wabt, PA bytecode is actual assembler output. The benchmark suite has grown from 7 to 21 kernels including 14 external kernels not designed for PA and 3 negative cases where PA performs poorly.
 
-PA's bytecode density (1.85 B/instr) is genuinely competitive, but PA's ISA is far simpler than JVM or Wasm — it has no type system, no structured control flow, no validation. Comparing raw instruction bytes ignores the semantic density that Wasm carries per instruction.
+PA's bytecode density (1.85 B/instr) is genuinely competitive, but PA's ISA is far simpler than JVM or Wasm — it has no type system, no structured control flow, no validation. Comparing raw instruction bytes ignores the semantic density that Wasm carries per instruction. A single Wasm `i32.add` carries type, stack-effect, and validation information; PA's `ad xF` carries only "add these two registers."
 
 The cell ablation study suggests the encoding captures genuine frequency patterns rather than arbitrary benchmark-specific mappings. But 21 kernels is still a small corpus, and the cell table was not derived independently of the benchmark suite.
 

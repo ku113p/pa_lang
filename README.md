@@ -114,7 +114,7 @@ Cells are compact symbolic operand templates. Each cell maps to a fixed operand 
 | `p*` | `pA` → `p0,v0,#00` | Predicate compare | 4 |
 | `q*` | `qA` → back target 0 | Local branch target | 4 |
 
-27 cells total. See [ref/cells.md](.ai/ref/cells.md) for the full table.
+27 cells total, covering all 7 benchmark kernels.
 
 ## Try It
 

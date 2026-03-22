@@ -1,0 +1,12 @@
+; XOR each byte in buffer with key
+; r0 = pointer to buffer
+; r1 = XOR key (low byte used)
+; r2 = byte count
+@L0:
+ld mJ
+xr xK
+st mJ
+ad iB
+sb iI
+jn qA
+rt

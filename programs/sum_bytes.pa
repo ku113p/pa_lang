@@ -1,0 +1,11 @@
+; Sum bytes in a buffer
+; r0 = pointer to buffer
+; r1 = accumulator (result)
+; r2 = byte count
+@L0:
+ld mJ
+ad xF
+ad iB
+sb iI
+jn qA
+rt

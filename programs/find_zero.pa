@@ -1,0 +1,13 @@
+; Find first zero byte in buffer (16 at a time)
+; r0 = pointer to buffer
+; Result: r2 = address of first zero byte
+@L0:
+gld gA
+gcm pA
+jn qB
+ad iF
+jm qA
+@F0:
+ffz! r2,p0
+ad xG
+rt

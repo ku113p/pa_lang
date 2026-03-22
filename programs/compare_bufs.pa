@@ -1,0 +1,19 @@
+; Compare two buffers (16 bytes at a time)
+; r0 = pointer to buffer 1
+; r1 = pointer to buffer 2
+; r2 = block count (length / 16)
+; Result: r0 = 0 (equal), r1 = 1 (not equal)
+@L0:
+gld gA
+gld gD
+gcp pE
+jn qB
+ad iF
+ad iM
+sb iI
+jn qA
+mv iA
+rt
+@F0:
+mv iH
+rt

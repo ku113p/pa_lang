@@ -1,3 +1,4 @@
+BITS 64
 ; Sum bytes in buffer
 ; rdi = pointer, rsi = count, result in eax
   xor eax, eax

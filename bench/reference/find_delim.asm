@@ -1,3 +1,4 @@
+BITS 64
 ; Find first delimiter byte (SSE2)
 ; rdi = pointer, esi = delimiter, rdx = block count
 ; result: rax = address or 0 if not found

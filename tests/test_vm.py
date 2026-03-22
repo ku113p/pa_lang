@@ -204,3 +204,89 @@ rt
     vm.setup_memory(0x1000, bytes(data))
     vm.run()
     assert vm.r[2] == 0x1000 + 7
+
+
+def test_fibonacci():
+    """Fibonacci F(10) = 55."""
+    source = """\
+@L0:
+mv  xK
+ad  xD
+mv! r0,r3
+sb  iI
+jn  qA
+rt
+"""
+    vm = _run_program(source, r0=0, r1=1, r2=10)
+    assert vm.r[0] == 55
+
+
+def test_fibonacci_small():
+    """Fibonacci F(1) = 1."""
+    source = """\
+@L0:
+mv  xK
+ad  xD
+mv! r0,r3
+sb  iI
+jn  qA
+rt
+"""
+    vm = _run_program(source, r0=0, r1=1, r2=1)
+    assert vm.r[0] == 1
+
+
+def test_min_byte():
+    """Minimum of [50, 30, 70, 10, 90] = 10."""
+    source = """\
+ld  mE
+ad  iB
+sb  iI
+@L0:
+ld  mJ
+cm! r3,r1
+jn  qB
+mv  xF
+@F0:
+ad  iB
+sb  iI
+jn  qA
+rt
+"""
+    data = bytes([50, 30, 70, 10, 90])
+    vm = VM()
+    code = assemble(source)
+    vm.load_program(code)
+    vm.setup_memory(0x1000, data)
+    vm.r[0] = 0x1000
+    vm.r[2] = 5
+    vm.run()
+    assert vm.r[1] == 10
+
+
+def test_min_byte_already_first():
+    """Minimum is the first byte."""
+    source = """\
+ld  mE
+ad  iB
+sb  iI
+@L0:
+ld  mJ
+cm! r3,r1
+jn  qB
+mv  xF
+@F0:
+ad  iB
+sb  iI
+jn  qA
+rt
+"""
+    data = bytes([5, 30, 70, 80, 90])
+    vm = VM()
+    code = assemble(source)
+    vm.load_program(code)
+    vm.setup_memory(0x1000, data)
+    vm.r[0] = 0x1000
+    vm.r[2] = 5
+    vm.run()
+    assert vm.r[1] == 5

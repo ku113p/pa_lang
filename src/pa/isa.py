@@ -24,6 +24,8 @@ OPCODES: dict[str, tuple[int, str, bool]] = {
     "gcm": (0x22, "group", True),
     "gcp": (0x23, "group", True),
     "ffz": (0x24, "group", True),
+    # Extended-only (used via escape prefix, not as compact instructions)
+    "cm":  (0x19, "alu",   True),
 }
 
 OPCODE_BY_BYTE: dict[int, str] = {v[0]: k for k, v in OPCODES.items()}

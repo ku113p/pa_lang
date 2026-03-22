@@ -193,17 +193,23 @@ class VM:
         sub_op = self.code[self.pc]
         self.pc += 1
 
-        if sub_op == 0x24:  # ffz
-            if self.pc >= len(self.code):
-                raise VMError("truncated ffz operand")
-            operand = self.code[self.pc]
-            self.pc += 1
-            dst_reg = (operand >> 4) & 0x0F
-            src_preg = operand & 0x0F
-            mask = self.p[src_preg]
+        if self.pc >= len(self.code):
+            raise VMError("truncated extended operand")
+        operand = self.code[self.pc]
+        self.pc += 1
+        reg_a = (operand >> 4) & 0x0F
+        reg_b = operand & 0x0F
+
+        if sub_op == 0x24:  # ffz — find first zero/set bit in predicate
+            mask = self.p[reg_b]
             if mask == 0:
-                self.r[dst_reg] = 16
+                self.r[reg_a] = 16
             else:
-                self.r[dst_reg] = (mask & -mask).bit_length() - 1
+                self.r[reg_a] = (mask & -mask).bit_length() - 1
+        elif sub_op == 0x10:  # mv! — extended register-to-register move
+            self.r[reg_a] = self.r[reg_b] & MASK64
+            self._condition = self.r[reg_a] != 0
+        elif sub_op == 0x19:  # cm! — unsigned byte compare, sets condition
+            self._condition = (self.r[reg_a] & 0xFF) > (self.r[reg_b] & 0xFF)
         else:
             raise VMError(f"unknown extended sub-opcode 0x{sub_op:02x}")

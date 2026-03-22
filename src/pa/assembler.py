@@ -27,11 +27,11 @@ def _is_label(text: str) -> bool:
     return text.startswith("@") and text.endswith(":")
 
 
-def _instruction_size(mnemonic: str, cell_name: str | None) -> int:
+def _instruction_size(mnemonic: str, cell_name: str | None, is_extended: bool = False) -> int:
     """Return byte size of an instruction."""
     if mnemonic == "rt":
         return 1
-    if mnemonic == "ffz":
+    if is_extended or mnemonic == "ffz":
         # Extended: escape byte + sub-opcode + operand byte
         return 3
     return 2  # opcode + cell
@@ -46,7 +46,7 @@ def assemble(source: str) -> bytes:
     offsets: list[int] = []  # byte offset for each non-label line
     offset = 0
 
-    instruction_lines: list[tuple[int, str, str, str | None]] = []
+    instruction_lines: list[tuple[int, str, str, str | None, bool]] = []
 
     for line_num, text in lines:
         if _is_label(text):
@@ -57,23 +57,25 @@ def assemble(source: str) -> bytes:
             continue
 
         parts = text.split()
-        mnemonic = parts[0].rstrip("!")  # strip '!' suffix (extended marker)
+        raw_mnemonic = parts[0]
+        is_extended = raw_mnemonic.endswith("!")
+        mnemonic = raw_mnemonic.rstrip("!")
         cell_name = parts[1] if len(parts) > 1 else None
 
         if mnemonic not in OPCODES:
             raise AssemblyError(line_num, f"unknown mnemonic: {mnemonic}")
-        if OPCODES[mnemonic][2] and cell_name is None and mnemonic != "ffz":
+        if OPCODES[mnemonic][2] and cell_name is None and mnemonic not in ("ffz", "cm"):
             raise AssemblyError(line_num, f"{mnemonic} requires a cell operand")
 
-        size = _instruction_size(mnemonic, cell_name)
-        instruction_lines.append((line_num, text, mnemonic, cell_name))
+        size = _instruction_size(mnemonic, cell_name, is_extended)
+        instruction_lines.append((line_num, text, mnemonic, cell_name, is_extended))
         offsets.append(offset)
         offset += size
 
     # --- Pass 2: emit bytecode ---
     code = bytearray()
 
-    for idx, (line_num, text, mnemonic, cell_name) in enumerate(instruction_lines):
+    for idx, (line_num, text, mnemonic, cell_name, is_extended) in enumerate(instruction_lines):
         op_byte = OPCODES[mnemonic][0]
         current_offset = offsets[idx]
 
@@ -81,22 +83,23 @@ def assemble(source: str) -> bytes:
             code.append(op_byte)
             continue
 
-        if mnemonic == "ffz":
-            # Extended form: ex3 + ffz sub-opcode + operand encoding
-            # For MVP: ffz always means "ffz r2,p0"
-            # Encode as: ex3(0xF3) + 0x24(ffz) + 0x20 (r2=2, p0=0 packed)
-            code.append(ESCAPES["ex3"])
+        if mnemonic == "ffz" or (is_extended and mnemonic in ("mv", "cm")):
+            # Extended form: escape + sub-opcode + operand byte
+            if mnemonic == "ffz":
+                code.append(ESCAPES["ex3"])
+            else:
+                code.append(ESCAPES["ex0"])
             code.append(op_byte)
-            # Operand byte: high nibble = dst scalar reg, low nibble = src pred reg
-            # Parse extended operands if provided, otherwise default r2,p0
             operand_text = cell_name or ""
             parts = operand_text.split(",")
             if len(parts) == 2:
-                dst_reg = int(parts[0].strip().lstrip("r"))
-                src_preg = int(parts[1].strip().lstrip("p"))
+                a_str = parts[0].strip().lstrip("rp")
+                b_str = parts[1].strip().lstrip("rp")
+                a = int(a_str)
+                b = int(b_str)
             else:
-                dst_reg, src_preg = 2, 0
-            code.append((dst_reg << 4) | src_preg)
+                a, b = 0, 0
+            code.append((a << 4) | b)
             continue
 
         if cell_name is None:

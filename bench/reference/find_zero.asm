@@ -1,3 +1,4 @@
+BITS 64
 ; Find first zero byte (SSE2)
 ; rdi = pointer, result in rax
   pxor xmm1, xmm1

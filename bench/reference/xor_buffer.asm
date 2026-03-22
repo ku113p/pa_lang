@@ -1,3 +1,4 @@
+BITS 64
 ; XOR buffer with key byte
 ; rdi = pointer, esi = key, rdx = count
 loop:

@@ -1,3 +1,4 @@
+BITS 64
 ; Compare two buffers (SSE2, 16 at a time)
 ; rdi = buf1, rsi = buf2, rdx = block count (len/16)
 ; result: eax = 0 equal, 1 not equal

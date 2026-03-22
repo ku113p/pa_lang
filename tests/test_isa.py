@@ -37,4 +37,4 @@ def test_cell_expansions_well_formed():
 
 
 def test_opcode_count():
-    assert len(OPCODES) == 13  # 14 MVP opcodes (ffz shares with extended)
+    assert len(OPCODES) == 14  # 13 MVP + cm (extended-only)

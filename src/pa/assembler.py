@@ -31,7 +31,7 @@ def _instruction_size(mnemonic: str, cell_name: str | None, is_extended: bool = 
     """Return byte size of an instruction."""
     if mnemonic == "rt":
         return 1
-    if is_extended or mnemonic == "ffz":
+    if is_extended:
         # Extended: escape byte + sub-opcode + operand byte
         return 3
     return 2  # opcode + cell
@@ -64,7 +64,7 @@ def assemble(source: str) -> bytes:
 
         if mnemonic not in OPCODES:
             raise AssemblyError(line_num, f"unknown mnemonic: {mnemonic}")
-        if OPCODES[mnemonic][2] and cell_name is None and mnemonic not in ("ffz", "cm"):
+        if OPCODES[mnemonic][2] and cell_name is None and not is_extended:
             raise AssemblyError(line_num, f"{mnemonic} requires a cell operand")
 
         size = _instruction_size(mnemonic, cell_name, is_extended)
@@ -83,7 +83,7 @@ def assemble(source: str) -> bytes:
             code.append(op_byte)
             continue
 
-        if mnemonic == "ffz" or (is_extended and mnemonic in ("mv", "cm")):
+        if is_extended:
             # Extended form: escape + sub-opcode + operand byte
             if mnemonic == "ffz":
                 code.append(ESCAPES["ex3"])

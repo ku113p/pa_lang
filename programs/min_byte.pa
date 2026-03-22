@@ -1,16 +1,14 @@
 ; Find minimum byte in buffer
 ; r0 = pointer, r2 = count
 ; Result: r1 = minimum byte value
-; Note: uses extended cm! (PA lacks compact compare)
+; v0.2: uses compact cm + conditional select (branchless)
 ld  mE
 ad  iB
 sb  iI
 @L0:
 ld  mJ
-cm! r3,r1
-jn  qB
-mv  xF
-@F0:
+cm  cE
+cs  xF
 ad  iB
 sb  iI
 jn  qA

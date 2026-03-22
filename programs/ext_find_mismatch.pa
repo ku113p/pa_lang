@@ -1,0 +1,20 @@
+; Find first mismatching byte between two buffers
+; r0 = pointer to buffer 1
+; r1 = pointer to buffer 2
+; r2 = block count (length / 16)
+; Result: r2 = address of first mismatch, or r0 = 0 if all match
+@L0:
+gld gA
+gld gD
+gcp pE
+jn qB
+ad iF
+ad iM
+sb iI
+jn qA
+mv iA
+rt
+@F0:
+ffz fA
+ad xG
+rt

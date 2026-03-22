@@ -1,0 +1,29 @@
+; ext_find_byte_gt.pa — Find first byte above threshold
+; Class B: scalar loop, uses extended cm! instruction
+;
+; Input:  r0 = pointer to buffer
+;         r1 = threshold value
+;         r2 = length (byte count)
+; Output: r2 = address of first byte > threshold (if found)
+;         r0 = 0 if not found
+;
+; Strategy: scalar loop, load byte, compare with cm!
+;   cm! r3,r1 sets condition if (r3 & 0xFF) > (r1 & 0xFF)
+;   i.e., loaded byte > threshold
+;
+; Friction: cm! is extended (3 bytes), no SIMD compare path
+; 9 instructions, 19 bytes
+
+@L0:
+  ld  mJ          ; r3 = mem[r0]
+  cm  cF          ; cond = (r3 > r1) = (byte > threshold)
+  jn  qB          ; if byte > threshold, goto @F0 (found)
+  ad  iB          ; r0 += 1
+  sb  iI          ; r2 -= 1
+  jn  qA          ; if r2 != 0, loop → @L0
+  mv  iA          ; not found: r0 = 0
+  rt
+
+@F0:
+  mv  xG          ; found: r2 = r0 (address of byte)
+  rt

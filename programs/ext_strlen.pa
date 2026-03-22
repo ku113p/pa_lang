@@ -1,0 +1,14 @@
+; Find first null byte (strlen), return address of null
+; r0 = pointer to buffer
+; Result: r2 = address of first null byte
+; Caller computes length = r2 - original_r0
+@L0:
+gld gA
+gcm pA
+jn qB
+ad iF
+jm qA
+@F0:
+ffz fA
+ad xG
+rt

@@ -8,6 +8,6 @@ jn qB
 ad iF
 jm qA
 @F0:
-ffz! r2,p0
+ffz fA
 ad xG
 rt

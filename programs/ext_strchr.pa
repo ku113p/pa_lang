@@ -1,0 +1,34 @@
+; ext_strchr.pa — Find byte in null-terminated string
+; Class B: scalar loop, no SIMD path
+;
+; Input:  r0 = pointer to null-terminated string
+;         r1 = byte to find
+; Output: r2 = address of match (if found)
+;         r0 = 0 if not found (hit null terminator)
+;
+; Strategy: scalar byte-by-byte loop
+;   - Load byte from [r0] into r3
+;   - Test for null (r3 == 0) → not found
+;   - Test for match (r3 ^ r1 == 0) → found
+;   - Advance pointer and repeat
+;
+; Friction: two conditional checks per byte, xr xK corrupts r3
+;           (OK since we reload next iteration)
+; 10 instructions, 20 bytes
+
+@L0:
+  ld  mJ          ; r3 = mem[r0]
+  sb  iK          ; r3 -= 0 (no-op on value), cond = r3 != 0
+  jn  qD          ; if not null, goto @F1 (check match)
+  mv  iA          ; null found: r0 = 0 (not found)
+  rt
+
+@F1:
+  xr  xK          ; r3 ^= r1. match → r3=0, cond=false. no match → cond=true
+  jn  qC          ; if no match (cond=true), goto @L1 (advance)
+  mv  xG          ; match found: r2 = r0 (save address)
+  rt
+
+@L1:
+  ad  iB          ; r0 += 1
+  jm  qA          ; goto @L0

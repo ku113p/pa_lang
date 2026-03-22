@@ -1,0 +1,41 @@
+; ext_bytecount.pa — Count occurrences of byte in buffer
+; Class B: scalar loop, heavy extended-instruction friction
+;
+; Input:  r0 = pointer to buffer
+;         r1 = byte to count
+;         r2 = length (byte count)
+; Output: r1 = count of matching bytes
+;
+; Strategy: scalar loop with register shuffling via extended mv!
+;   - r0 = pointer (base for ld mJ, advances each iteration)
+;   - r1 = target byte (needed for xr xK equality test)
+;   - r2 = remaining length (decrements)
+;   - r3 = temp (loaded byte, then xor result)
+;   - r4 = saved target byte (extended register)
+;   - r5 = saved count (extended register)
+;
+; Friction: no compact r3+=1 cell (iK is r3,#0 not r3,#1)
+;           count must live in r1 (has iH for +1) but r1 is also
+;           needed for xr xK test. Requires 3 extended mv! per iteration
+;           to swap count/target in and out of r1.
+;           mv! clobbers condition flag, so sb iK re-tests r3 after restore.
+; 14 instructions, 31 bytes. Bytes/instruction = 2.21.
+
+  mv! r4,r1       ; save target byte to r4 (extended, 3 bytes)
+  mv  iG          ; r1 = 0 (count)
+
+@L0:
+  mv! r5,r1       ; save count to r5 (extended)
+  mv! r1,r4       ; r1 = target byte (extended)
+  ld  mJ          ; r3 = mem[r0]
+  xr  xK          ; r3 ^= r1. match → r3=0. no match → r3≠0
+  mv! r1,r5       ; restore count to r1 (clobbers condition!)
+  sb  iK          ; r3 -= 0 (no-op), re-sets cond = r3 != 0
+  jn  qB          ; if no match (cond=true), skip increment → @F0
+  ad  iH          ; r1 += 1 (count++)
+
+@F0:
+  ad  iB          ; r0 += 1 (advance pointer)
+  sb  iI          ; r2 -= 1 (decrement remaining)
+  jn  qA          ; if r2 != 0, loop → @L0
+  rt

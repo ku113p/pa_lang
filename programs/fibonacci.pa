@@ -1,11 +1,11 @@
 ; Fibonacci: compute F(n)
 ; r0 = a = 0, r1 = b = 1, r2 = n (counter)
-; Result: r1 = F(n)
-; Note: uses extended mv! (no compact cell for r0:=r3)
+; Result: r0 = F(n)
+; v0.2: uses compact xL (r0,r3) instead of extended mv!
 @L0:
 mv  xK
 ad  xD
-mv! r0,r3
+mv  xL
 sb  iI
 jn  qA
 rt

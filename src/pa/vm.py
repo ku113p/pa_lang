@@ -25,13 +25,16 @@ class VM:
             0x12: self._op_st,
             0x13: self._op_ad,
             0x14: self._op_sb,
+            0x15: self._op_cs,   # v0.2: conditional select
             0x17: self._op_xr,
+            0x19: self._op_cm,   # v0.2: compact ordered compare
             0x1A: self._op_jm,
             0x1C: self._op_jn,
             0x1E: self._op_rt,
             0x20: self._op_gld,
             0x22: self._op_gcm,
             0x23: self._op_gcp,
+            0x24: self._op_ffz,  # v0.2: compact predicate extraction
         }
 
     def load_program(self, code: bytes) -> None:
@@ -110,6 +113,39 @@ class VM:
         dst, val = self._alu_operands(exp)
         self.r[dst] = (self.r[dst] ^ val) & MASK64
         self._condition = self.r[dst] != 0
+
+    def _op_cs(self):
+        """v0.2: Conditional select — if condition, perform move; else no-op.
+        Does NOT update condition flag."""
+        exp = self._read_cell()
+        if self._condition:
+            dst, val = self._alu_operands(exp)
+            self.r[dst] = val & MASK64
+        # condition flag is NOT updated
+
+    def _op_cm(self):
+        """v0.2: Compact ordered compare — sets condition based on compare mode."""
+        exp = self._read_cell()
+        a_val = self.r[exp[1]] & 0xFF
+        b_val = (self.r[exp[3]] if exp[2] == "reg" else exp[3]) & 0xFF
+        mode = exp[5]
+        if mode == "ltu":
+            self._condition = a_val < b_val
+        elif mode == "gtu":
+            self._condition = a_val > b_val
+        else:
+            raise VMError(f"unknown compare mode: {mode}")
+
+    def _op_ffz(self):
+        """v0.2: Compact predicate extraction — find first set bit."""
+        exp = self._read_cell()
+        dst = exp[1]
+        p_idx = exp[3]
+        mask = self.p[p_idx]
+        if mask == 0:
+            self.r[dst] = 16
+        else:
+            self.r[dst] = (mask & -mask).bit_length() - 1
 
     # --- Memory operations ---
 

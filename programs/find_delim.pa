@@ -13,6 +13,6 @@ jn qA
 mv iA
 rt
 @F0:
-ffz! r2,p0
+ffz fA
 ad xG
 rt

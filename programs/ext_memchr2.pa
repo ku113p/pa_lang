@@ -1,0 +1,48 @@
+; ext_memchr2.pa — Find first occurrence of either of two bytes
+; Class B: scalar loop, heavy friction from dual comparison
+;
+; Input:  r0 = pointer to buffer
+;         r1 = byte1 (first target)
+;         r2 = length (byte count)
+;         r3 = byte2 (second target)
+; Output: r2 = address of first match (if found)
+;         r0 = 0 if not found
+;
+; Strategy: scalar loop, load byte, check byte1 via xr xK,
+;   then check byte2 via dual cm! (simulating equality with
+;   two unsigned-greater-than checks: if neither a>b nor b>a, then a==b).
+;
+; Register plan:
+;   r0 = pointer (advances), r1 = byte1, r2 = remaining length
+;   r3 = temp (loaded byte / xor result)
+;   r4 = byte2 (saved via extended mv!)
+;   r5 = loaded byte (saved via extended mv! for second comparison)
+;
+; Friction: mv! to save byte2 and loaded byte, dual cm! for
+;   equality check on byte2. No compact xr cell for r4/r5.
+; 16 instructions, 37 bytes
+
+  mv! r4,r3       ; save byte2 to r4 (extended, 3 bytes)
+
+@L0:
+  ld  mJ          ; r3 = mem[r0]
+  mv! r5,r3       ; save loaded byte to r5 (extended)
+  xr  xK          ; r3 ^= r1. byte1 match → r3=0, cond=false
+  jn  qD          ; if no byte1 match (cond=true), goto @F1 (check byte2)
+  mv  xG          ; byte1 match! r2 = r0
+  rt
+
+@F1:
+  cm! r5,r4       ; cond = (loaded > byte2)
+  jn  qB          ; if loaded > byte2, no match → @F0 (advance)
+  cm! r4,r5       ; cond = (byte2 > loaded)
+  jn  qB          ; if byte2 > loaded, no match → @F0 (advance)
+  mv  xG          ; byte2 match! (neither > the other → equal) r2 = r0
+  rt
+
+@F0:
+  ad  iB          ; r0 += 1
+  sb  iI          ; r2 -= 1
+  jn  qA          ; if r2 != 0, loop → @L0
+  mv  iA          ; not found: r0 = 0
+  rt

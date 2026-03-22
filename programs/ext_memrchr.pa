@@ -1,0 +1,33 @@
+; ext_memrchr.pa — Find last occurrence of byte (reverse scan)
+; Class C: PA has only ffz! (BSF), no reverse bit scan (BSR equivalent)
+;
+; Input:  r0 = pointer to one past end of buffer
+;         r1 = byte to find
+;         r2 = length (byte count)
+; Output: r2 = address of last match (if found)
+;         r0 = 0 if not found
+;
+; Strategy: scalar reverse scan — decrement pointer, load, xor-compare.
+;   xr xK computes r3 ^= r1; condition = (r3 != 0) = not a match.
+;   On match (r3 ^ r1 == 0), condition is false → fall through past jn.
+;
+; Why Class C: x86 memrchr uses pcmpeqb + pmovmskb + BSR to find the
+;   LAST matching byte in a 16-byte chunk. PA's ffz! finds the FIRST
+;   set bit only. There is no reverse-ffz or BSR equivalent, so SIMD
+;   reverse search is impossible. Forced to scan byte-by-byte backward.
+;
+; 9 instructions, 19 bytes (scalar only)
+
+@L0:
+  sb  iB          ; r0 -= 1 (decrement pointer)
+  ld  mJ          ; r3 = mem[r0]
+  xr  xK          ; r3 ^= r1, cond = (r3 != 0) = not match
+  jn  qB          ; if not match, goto @F0
+  mv  xG          ; match: r2 = r0 (address of byte)
+  rt
+
+@F0:
+  sb  iI          ; r2 -= 1
+  jn  qA          ; if r2 != 0, loop → @L0
+  mv  iA          ; not found: r0 = 0
+  rt

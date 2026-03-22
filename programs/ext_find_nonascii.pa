@@ -1,0 +1,33 @@
+; ext_find_nonascii.pa — Find first non-ASCII byte (byte >= 128)
+; Class C: PA has no ordered vector compare; scalar fallback only
+;
+; Input:  r0 = pointer to buffer
+;         r1 = 127 (threshold, must be set by caller)
+;         r2 = length (byte count)
+; Output: r2 = address of first non-ASCII byte (if found)
+;         r0 = 0 if not found
+;
+; Strategy: scalar loop, load byte, cm! r3,r1 tests (byte > 127)
+;   A byte with the high bit set is >= 128, i.e., > 127.
+;
+; Why Class C: In x86 SSE2, pmovmskb directly extracts high bits from
+;   all 16 bytes — no compare needed. PA has no pmovmskb equivalent,
+;   no way to extract bit masks from vector lanes, and no ordered
+;   vector compare. The scalar cm! loop is 16x slower than SIMD.
+;   PA cannot set r1=127 compactly either (no imm8 for r1).
+;
+; 9 instructions, 19 bytes (scalar only)
+
+@L0:
+  ld  mJ          ; r3 = mem[r0]
+  cm  cF          ; cond = (r3 > r1) = (byte > 127) = non-ASCII
+  jn  qB          ; if non-ASCII, goto @F0 (found)
+  ad  iB          ; r0 += 1
+  sb  iI          ; r2 -= 1
+  jn  qA          ; if r2 != 0, loop → @L0
+  mv  iA          ; not found: r0 = 0
+  rt
+
+@F0:
+  mv  xG          ; found: r2 = r0 (address of non-ASCII byte)
+  rt

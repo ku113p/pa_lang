@@ -1,0 +1,22 @@
+; ext_memset.pa — Fill buffer with constant byte
+; Class B: scalar store loop, no vector store path available
+;
+; Input:  r0 = pointer to buffer
+;         r1 = byte value to fill
+;         r2 = length (byte count)
+; Output: buffer filled with r1 & 0xFF at each position
+;
+; Strategy: scalar loop using st mE (stores r1 to mem[r0])
+;   st mE: src=r1, base=r0, offset=0 → mem[r0] = r1 & 0xFF
+;
+; Friction: scalar only — no vector store instruction in PA,
+;   so 16x slower than a hypothetical SIMD fill. The loop itself
+;   is compact (no extended instructions needed).
+; 5 instructions, 9 bytes
+
+@L0:
+  st  mE          ; mem[r0] = r1 & 0xFF
+  ad  iB          ; r0 += 1
+  sb  iI          ; r2 -= 1
+  jn  qA          ; if r2 != 0, loop → @L0
+  rt

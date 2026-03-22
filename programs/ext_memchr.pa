@@ -1,0 +1,18 @@
+; Find first occurrence of byte in buffer (16 at a time)
+; r0 = pointer to buffer
+; r1 = byte to find
+; r2 = block count (length / 16)
+; Result: r2 = address of byte, or r0 = 0 if not found
+@L0:
+gld gA
+gcm pF
+jn qB
+ad iF
+sb iI
+jn qA
+mv iA
+rt
+@F0:
+ffz fA
+ad xG
+rt

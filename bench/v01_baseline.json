@@ -1,0 +1,22 @@
+{
+  "version": "v0.1",
+  "note": "Captured from Stage 1 final benchmark run before Phase 3 changes",
+  "kernels": {
+    "sum_bytes":    {"pa_bytecode": 11, "x86_machine": 16, "wasm_instr": 40, "extended": 0, "coverage": 83.3},
+    "find_zero":    {"pa_bytecode": 16, "x86_machine": 33, "wasm_instr": 40, "extended": 1, "coverage": 75.0},
+    "xor_buffer":   {"pa_bytecode": 13, "x86_machine": 16, "wasm_instr": 41, "extended": 0, "coverage": 85.7},
+    "compare_bufs": {"pa_bytecode": 22, "x86_machine": 45, "wasm_instr": 70, "extended": 0, "coverage": 83.3},
+    "find_delim":   {"pa_bytecode": 21, "x86_machine": 52, "wasm_instr": 64, "extended": 1, "coverage": 72.7},
+    "fibonacci":    {"pa_bytecode": 12, "x86_machine": 13, "wasm_instr": 42, "extended": 1, "coverage": 66.7},
+    "min_byte":     {"pa_bytecode": 22, "x86_machine": 24, "wasm_instr": 70, "extended": 1, "coverage": 81.8}
+  },
+  "aggregates": {
+    "total_pa_bytecode": 117,
+    "total_x86_machine": 199,
+    "total_wasm_instr": 367,
+    "weighted_bytecode_x86_ratio": 58.8,
+    "weighted_bytecode_wasm_ratio": 31.9,
+    "bytes_per_instruction": 1.92,
+    "total_extended": 4
+  }
+}

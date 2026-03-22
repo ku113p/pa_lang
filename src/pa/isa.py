@@ -14,7 +14,9 @@ OPCODES: dict[str, tuple[int, str, bool]] = {
     "st":  (0x12, "mem",   True),
     "ad":  (0x13, "alu",   True),
     "sb":  (0x14, "alu",   True),
+    "cs":  (0x15, "alu",   True),   # v0.2: conditional select
     "xr":  (0x17, "alu",   True),
+    "cm":  (0x19, "alu",   True),   # v0.2: promoted from extended-only
     # Control flow
     "jm":  (0x1A, "flow",  True),
     "jn":  (0x1C, "flow",  True),
@@ -23,9 +25,7 @@ OPCODES: dict[str, tuple[int, str, bool]] = {
     "gld": (0x20, "group", True),
     "gcm": (0x22, "group", True),
     "gcp": (0x23, "group", True),
-    "ffz": (0x24, "group", True),
-    # Extended-only (used via escape prefix, not as compact instructions)
-    "cm":  (0x19, "alu",   True),
+    "ffz": (0x24, "group", True),   # v0.2: promoted from extended-only
 }
 
 OPCODE_BY_BYTE: dict[int, str] = {v[0]: k for k, v in OPCODES.items()}
@@ -91,6 +91,25 @@ CELLS: dict[str, tuple[int, tuple]] = {
     "qB": (0x51, ("branch", "forward", 0)),
     "qC": (0x52, ("branch", "back", 1)),
     "qD": (0x53, ("branch", "forward", 1)),
+
+    # --- v0.2 extensions (corpus-driven) ---
+
+    # f* — Predicate-result extraction (compact ffz)
+    "fA": (0x60, ("reg", 2, "preg", 0, "op", "ffz")),   # r2 = ffz(p0)
+    "fB": (0x61, ("reg", 1, "preg", 0, "op", "ffz")),   # r1 = ffz(p0)
+
+    # c* — Ordered compare cells (compact cm)
+    "cA": (0x70, ("reg", 0, "reg", 1, "cmp", "ltu")),    # cond = r0 < r1
+    "cB": (0x71, ("reg", 1, "reg", 3, "cmp", "ltu")),    # cond = r1 < r3
+    "cC": (0x72, ("reg", 0, "reg", 1, "cmp", "gtu")),    # cond = r0 > r1
+    "cD": (0x73, ("reg", 1, "reg", 3, "cmp", "gtu")),    # cond = r1 > r3
+    "cE": (0x74, ("reg", 3, "reg", 1, "cmp", "ltu")),    # cond = r3 < r1
+    "cF": (0x75, ("reg", 3, "reg", 1, "cmp", "gtu")),    # cond = r3 > r1
+
+    # x* extension — Additional register pairs
+    "xL": (0x05, ("reg", 0, "reg", 3)),                   # r0,r3
+    "xM": (0x06, ("reg", 2, "reg", 3)),                   # r2,r3
+    "xN": (0x07, ("reg", 3, "reg", 0)),                   # r3,r0
 }
 
 CELL_BY_BYTE: dict[int, str] = {v[0]: k for k, v in CELLS.items()}
@@ -102,6 +121,7 @@ CELL_BY_BYTE: dict[int, str] = {v[0]: k for k, v in CELLS.items()}
 CELL_EXPANSION_STR: dict[str, str] = {
     "xA": "r0,r1",   "xD": "r1,r0",   "xF": "r1,r3",
     "xG": "r2,r0",   "xK": "r3,r1",
+    "xL": "r0,r3",   "xM": "r2,r3",   "xN": "r3,r0",
     "iA": "r0,#0",   "iB": "r0,#1",   "iF": "r0,#16",
     "iG": "r1,#0",   "iH": "r1,#1",   "iI": "r2,#1",
     "iK": "r3,#0",   "iM": "r1,#16",
@@ -110,6 +130,10 @@ CELL_EXPANSION_STR: dict[str, str] = {
     "pA": "p0,v0,#00", "pB": "p0,v0,#FF",
     "pE": "p0,v0,v1",  "pF": "p0,v0,r1",
     "qA": "@L0",  "qB": "@F0",  "qC": "@L1",  "qD": "@F1",
+    # v0.2 extensions
+    "fA": "r2,p0",    "fB": "r1,p0",
+    "cA": "r0<r1",    "cB": "r1<r3",    "cC": "r0>r1",
+    "cD": "r1>r3",    "cE": "r3<r1",    "cF": "r3>r1",
 }
 
 # ---------------------------------------------------------------------------

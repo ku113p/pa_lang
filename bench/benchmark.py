@@ -28,6 +28,40 @@ KERNELS = [
 
 NEGATIVE_CASES = {"fibonacci", "min_byte"}
 
+EXTERNAL_KERNELS = [
+    "ext_memchr",
+    "ext_memcmp",
+    "ext_strchr",
+    "ext_strlen",
+    "ext_find_nonascii",
+    "ext_bytecount",
+    "ext_find_mismatch",
+    "ext_prefix_eq",
+    "ext_find_byte_lt",
+    "ext_find_byte_gt",
+    "ext_memrchr",
+    "ext_memchr2",
+    "ext_strspn",
+    "ext_memset",
+]
+
+EXTERNAL_CLASSIFICATION = {
+    "ext_memchr": "A",
+    "ext_memcmp": "A",
+    "ext_strchr": "B",
+    "ext_strlen": "A",
+    "ext_find_nonascii": "C",
+    "ext_bytecount": "B",
+    "ext_find_mismatch": "A",
+    "ext_prefix_eq": "A",
+    "ext_find_byte_lt": "B",
+    "ext_find_byte_gt": "B",
+    "ext_memrchr": "C",
+    "ext_memchr2": "B",
+    "ext_strspn": "C",
+    "ext_memset": "B",
+}
+
 # x86 machine code sizes — fallback estimates if nasm unavailable
 X86_CODE_SIZES_EST = {
     "sum_bytes": 14,
@@ -37,6 +71,20 @@ X86_CODE_SIZES_EST = {
     "find_delim": 42,
     "fibonacci": 12,
     "min_byte": 24,
+    "ext_memchr": 40,
+    "ext_memcmp": 25,
+    "ext_strchr": 20,
+    "ext_strlen": 28,
+    "ext_find_nonascii": 26,
+    "ext_bytecount": 18,
+    "ext_find_mismatch": 38,
+    "ext_prefix_eq": 24,
+    "ext_find_byte_lt": 20,
+    "ext_find_byte_gt": 20,
+    "ext_memrchr": 38,
+    "ext_memchr2": 22,
+    "ext_strspn": 18,
+    "ext_memset": 10,
 }
 
 
@@ -129,81 +177,85 @@ def count_instruction_types(bytecode):
     return compact, extended, no_operand
 
 
+def measure_kernel(name):
+    """Measure a single kernel's sizes. Returns dict of metrics."""
+    pa_path = os.path.join(PROGRAMS_DIR, f"{name}.pa")
+    asm_path = os.path.join(REFERENCE_DIR, f"{name}.asm")
+
+    # PA source
+    with open(pa_path) as f:
+        pa_source = f.read()
+    pa_code_lines = [
+        l.split(";")[0].strip()
+        for l in pa_source.splitlines()
+        if l.split(";")[0].strip() and not l.split(";")[0].strip().startswith(";")
+    ]
+    pa_code_bytes = len("\n".join(pa_code_lines).encode("utf-8"))
+
+    # PA bytecode
+    bytecode = assemble_file(pa_path)
+    pa_bytecode_size = len(bytecode)
+    compact, extended, no_op = count_instruction_types(bytecode)
+    total_instr = compact + extended + no_op
+    coverage = compact / total_instr * 100 if total_instr else 0
+
+    # x86 asm source
+    with open(asm_path) as f:
+        asm_source = f.read()
+    asm_code_lines = [
+        l.split(";")[0].strip()
+        for l in asm_source.splitlines()
+        if l.split(";")[0].strip() and not l.split(";")[0].strip().startswith(";")
+    ]
+    asm_code_bytes = len("\n".join(asm_code_lines).encode("utf-8"))
+    x86_machine, x86_assembled = measure_x86_size(asm_path)
+
+    # x86 instruction count
+    asm_instr_count = sum(1 for l in asm_code_lines if not l.endswith(":") and l)
+
+    # PA instruction count
+    pa_instr_count = sum(1 for l in pa_code_lines if not l.startswith("@"))
+
+    # Wasm (optional)
+    wasm_path = os.path.join(WASM_DIR, f"{name}.wasm")
+    wat_path = os.path.join(WASM_DIR, f"{name}.wat")
+    wasm_instr = 0
+    wasm_total = 0
+    wat_code_bytes = 0
+    if os.path.exists(wasm_path):
+        wasm_instr = wasm_code_body_size(wasm_path)
+        wasm_total = os.path.getsize(wasm_path)
+    if os.path.exists(wat_path):
+        with open(wat_path) as f:
+            wat_src = f.read()
+        wat_lines = [l.strip() for l in wat_src.splitlines() if l.strip() and not l.strip().startswith(";;")]
+        wat_code_bytes = len("\n".join(wat_lines).encode("utf-8"))
+
+    return {
+        "name": name,
+        "pa_code": pa_code_bytes,
+        "pa_bytecode": pa_bytecode_size,
+        "pa_instr": pa_instr_count,
+        "asm_code": asm_code_bytes,
+        "asm_instr": asm_instr_count,
+        "x86_machine": x86_machine,
+        "x86_assembled": x86_assembled,
+        "wasm_instr": wasm_instr,
+        "wasm_total": wasm_total,
+        "wat_code": wat_code_bytes,
+        "compact": compact,
+        "extended": extended,
+        "coverage": coverage,
+    }
+
+
 def measure_sizes():
     compile_wat_files()
-    results = []
+    return [measure_kernel(name) for name in KERNELS]
 
-    for name in KERNELS:
-        pa_path = os.path.join(PROGRAMS_DIR, f"{name}.pa")
-        asm_path = os.path.join(REFERENCE_DIR, f"{name}.asm")
 
-        # PA source
-        with open(pa_path) as f:
-            pa_source = f.read()
-        pa_code_lines = [
-            l.split(";")[0].strip()
-            for l in pa_source.splitlines()
-            if l.split(";")[0].strip() and not l.split(";")[0].strip().startswith(";")
-        ]
-        pa_code_bytes = len("\n".join(pa_code_lines).encode("utf-8"))
-
-        # PA bytecode
-        bytecode = assemble_file(pa_path)
-        pa_bytecode_size = len(bytecode)
-        compact, extended, no_op = count_instruction_types(bytecode)
-        total_instr = compact + extended + no_op
-        coverage = compact / total_instr * 100 if total_instr else 0
-
-        # x86 asm source
-        with open(asm_path) as f:
-            asm_source = f.read()
-        asm_code_lines = [
-            l.split(";")[0].strip()
-            for l in asm_source.splitlines()
-            if l.split(";")[0].strip() and not l.split(";")[0].strip().startswith(";")
-        ]
-        asm_code_bytes = len("\n".join(asm_code_lines).encode("utf-8"))
-        x86_machine, x86_assembled = measure_x86_size(asm_path)
-
-        # x86 instruction count
-        asm_instr_count = sum(1 for l in asm_code_lines if not l.endswith(":") and l)
-
-        # PA instruction count
-        pa_instr_count = sum(1 for l in pa_code_lines if not l.startswith("@"))
-
-        # Wasm
-        wasm_path = os.path.join(WASM_DIR, f"{name}.wasm")
-        wat_path = os.path.join(WASM_DIR, f"{name}.wat")
-        wasm_instr = 0
-        wasm_total = 0
-        wat_code_bytes = 0
-        if os.path.exists(wasm_path):
-            wasm_instr = wasm_code_body_size(wasm_path)
-            wasm_total = os.path.getsize(wasm_path)
-        if os.path.exists(wat_path):
-            with open(wat_path) as f:
-                wat_src = f.read()
-            wat_lines = [l.strip() for l in wat_src.splitlines() if l.strip() and not l.strip().startswith(";;")]
-            wat_code_bytes = len("\n".join(wat_lines).encode("utf-8"))
-
-        results.append({
-            "name": name,
-            "pa_code": pa_code_bytes,
-            "pa_bytecode": pa_bytecode_size,
-            "pa_instr": pa_instr_count,
-            "asm_code": asm_code_bytes,
-            "asm_instr": asm_instr_count,
-            "x86_machine": x86_machine,
-            "x86_assembled": x86_assembled,
-            "wasm_instr": wasm_instr,
-            "wasm_total": wasm_total,
-            "wat_code": wat_code_bytes,
-            "compact": compact,
-            "extended": extended,
-            "coverage": coverage,
-        })
-
-    return results
+def measure_external():
+    return [measure_kernel(name) for name in EXTERNAL_KERNELS]
 
 
 def print_results(results):
@@ -351,7 +403,82 @@ def verify_correctness():
     return all_ok
 
 
+def print_external_results(results):
+    """Print external kernel results grouped by classification."""
+    print("\n" + "=" * 80)
+    print("EXTERNAL KERNEL RESULTS — Generalization Test")
+    print("=" * 80)
+
+    x86_note = "assembled" if results[0]["x86_assembled"] else "estimated"
+
+    # Group by classification
+    groups = {"A": [], "B": [], "C": []}
+    for r in results:
+        cls = EXTERNAL_CLASSIFICATION.get(r["name"], "?")
+        groups[cls].append(r)
+
+    labels = {"A": "Class A — Fits Naturally", "B": "Class B — Fits With Friction",
+              "C": "Class C — Does Not Fit"}
+
+    print(f"\n{'Kernel':<20} {'Cls':>3} {'PA bc':>5} {'x86':>5} {'PA/x86':>6} | "
+          f"{'Ext':>4} {'Cov':>5} {'B/I':>5}")
+    print("-" * 80)
+
+    for cls in ["A", "B", "C"]:
+        if not groups[cls]:
+            continue
+        print(f"  {labels[cls]}")
+        for r in groups[cls]:
+            bc_x86 = r["pa_bytecode"] / r["x86_machine"] * 100 if r["x86_machine"] else 0
+            ext_str = f"{r['extended']}" if r["extended"] else "-"
+            bpi = r["pa_bytecode"] / r["pa_instr"] if r["pa_instr"] else 0
+            name_short = r["name"].replace("ext_", "")
+            print(f"  {name_short:<18} {cls:>3} {r['pa_bytecode']:>3}B {r['x86_machine']:>4}B {bc_x86:>5.0f}% | "
+                  f"{ext_str:>4} {r['coverage']:>4.0f}% {bpi:>5.2f}")
+
+    print("-" * 80)
+
+    # Per-class summaries
+    for cls in ["A", "B", "C"]:
+        if not groups[cls]:
+            continue
+        total_pa = sum(r["pa_bytecode"] for r in groups[cls])
+        total_x86 = sum(r["x86_machine"] for r in groups[cls])
+        ratio = total_pa / total_x86 * 100 if total_x86 else 0
+        total_ext = sum(r["extended"] for r in groups[cls])
+        total_instr = sum(r["pa_instr"] for r in groups[cls])
+        bpi = total_pa / total_instr if total_instr else 0
+        print(f"  Class {cls} avg:       {cls:>3} {total_pa:>3}B {total_x86:>4}B {ratio:>5.0f}% | "
+              f"{total_ext:>4} {'':>5} {bpi:>5.2f}")
+
+    # Overall
+    total_pa = sum(r["pa_bytecode"] for r in results)
+    total_x86 = sum(r["x86_machine"] for r in results)
+    total_instr = sum(r["pa_instr"] for r in results)
+    ratio = total_pa / total_x86 * 100 if total_x86 else 0
+    bpi = total_pa / total_instr if total_instr else 0
+    print(f"\n  Overall external:  {'':>3} {total_pa:>3}B {total_x86:>4}B {ratio:>5.0f}% | "
+          f"{'':>4} {'':>5} {bpi:>5.2f}")
+    print(f"  x86 sizes: {x86_note}")
+
+    # Classification distribution
+    print(f"\n  Distribution: A={len(groups['A'])}, B={len(groups['B'])}, C={len(groups['C'])} "
+          f"({len(results)} total)")
+    print()
+
+
 if __name__ == "__main__":
-    results = measure_sizes()
-    print_results(results)
-    verify_correctness()
+    import argparse
+    parser = argparse.ArgumentParser(description="PA benchmark harness")
+    parser.add_argument("--external", action="store_true", help="Run external kernels only")
+    parser.add_argument("--all", action="store_true", help="Run original + external kernels")
+    args = parser.parse_args()
+
+    if args.external or args.all:
+        ext_results = measure_external()
+        print_external_results(ext_results)
+
+    if not args.external:
+        results = measure_sizes()
+        print_results(results)
+        verify_correctness()

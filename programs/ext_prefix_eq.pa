@@ -1,0 +1,13 @@
+; Check if first 16 bytes of two buffers match
+; r0 = pointer to buffer 1
+; r1 = pointer to buffer 2
+; Result: r0 = 0 (equal), r0 = 1 (not equal)
+gld gA
+gld gD
+gcp pE
+jn qB
+mv iA
+rt
+@F0:
+mv iB
+rt

@@ -1,0 +1,50 @@
+; ext_strspn.pa — Count leading bytes equal to accept byte
+; Class C: PA has no set-membership operation
+;
+; Input:  r0 = string pointer (null-terminated)
+;         r1 = single accept byte (degenerate 1-byte set)
+; Output: r1 = count of leading bytes equal to accept byte
+;
+; The general strspn tests each byte against an arbitrary set of
+; accepted characters. This needs either:
+;   - A 256-byte lookup table (x86 scalar approach), or
+;   - Multiple SIMD compares + OR (x86 vector approach)
+;
+; PA cannot do either:
+;   - No indexed table lookup (no [base+index] addressing)
+;   - No predicate OR to combine multiple vector compares
+;   - Only 4 compact registers; nested loops require extended mv!
+;
+; This implements the degenerate case: accept set = {one byte}.
+; Even this requires 3 extended mv! per iteration to juggle
+; the count and target byte through r1 for xr xK test.
+;
+; Why Class C: the fundamental operation (set membership) is
+;   unexpressible in PA. General multi-byte accept sets would
+;   require O(set_size) comparisons per input byte with no
+;   compact encoding path.
+;
+; 12 instructions, ~26 bytes (degenerate 1-byte-set scalar only)
+
+mv! r4,r1         ; save accept byte to r4
+mv  iG            ; r1 = 0 (count)
+
+@L0:
+  ld  mJ          ; r3 = mem[r0]
+  sb  iK          ; test r3 != 0 (null check), r3 unchanged
+  jn  qD          ; if not null, goto @F1 (compare)
+  rt              ; null terminator: return count in r1
+
+@F1:
+  mv! r5,r1       ; save count to r5
+  mv! r1,r4       ; r1 = accept byte (for xr xK)
+  xr  xK          ; r3 ^= r1, r3=0 if match, r3≠0 if not
+  mv! r1,r5       ; restore count to r1 (clobbers condition!)
+  sb  iK          ; r3 -= 0 (no-op), re-sets cond = r3 != 0
+  jn  qB          ; if not match (cond=true), done → @F0
+  ad  iH          ; r1 += 1 (count++)
+  ad  iB          ; r0 += 1 (next byte)
+  jm  qA          ; loop → @L0
+
+@F0:
+  rt              ; not in accept set: return count in r1
